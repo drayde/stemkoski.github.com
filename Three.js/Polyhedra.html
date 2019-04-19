@@ -168,29 +168,55 @@
 			scene.add(polyhedronMesh);
 		}
 
+		function polyhedronGetAdjacentVertices(vertex, edges) { //the id of vertex, all edges
+			var result = [];
+			for (var i = 0; i < edges.length; i++) {
+				if (edges[i][0] == vertex) {
+					result.push(edges[i][1]);
+				} else if (
+					edges[i][1] == vertex) {
+					result.push(edges[i][0]);
+				}
+			}
+			return result;
+		}
+		function polyhedronGetOpposingVertex(vertex, vertices, edges, tolerance) {
+			var current = new THREE.Vector3(-vertices[vertex].x, -vertices[vertex].y, -vertices[vertex].z);
+			for (var i = 0; i < vertices.length; i++) {
+				if ((current.distanceTo(vertices[i])) < tolerance) {
+					return i;
+				}
+			}
+		}
 		//NEW 
 		function polyhedronDataToPlaneData(data) {
 			var vertex = []
 			for (var i = 0; i < data.vertex.length; i++) {
 				vertex.push(new THREE.Vector3(data.vertex[i][0], data.vertex[i][1], data.vertex[i][2]).multiplyScalar(100));
 			}
+
+			//define relation
 			var furthest = [];
 			for (var i = 0; i < vertex.length; i++) {
-				var current = new THREE.Vector3(-vertex[i].x, -vertex[i].y, -vertex[i].z);
-				for (var j = 0; j < vertex.length; j++) {
-					if ((current.distanceTo(vertex[j])) < 0.1) {
-						furthest.push({ from: i, to: j });
-						break;
-					}
-				}
+				furthest.push({ from: i, to: polyhedronGetOpposingVertex(i, vertex, data.edge, 0.1) });
 			}
+
+			//concatinate relations
+			var adjacent = [];
+			for (var i = 0; i < furthest.length; i++) {
+				polyhedronGetAdjacentVertices(furthest[i].to, data.edge).forEach(element => {
+					adjacent.push({from: furthest[i].from, to: element});
+				});
+			}
+
+			var toRender = adjacent;
 			var polyhedron = new THREE.Object3D();
 			// convert edge data to cylinders
 			var edgeMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
 			var edgeAmalgam = new THREE.Geometry();
-			for (var i = 0; i < furthest.length; i++) {
-				var index0 = furthest[i].from;
-				var index1 = furthest[i].to;
+			for (var i = 0; i < toRender.length; i++) {
+				var index0 = toRender[i].from;
+				var index1 = toRender[i].to;
 				var eMesh = cylinderMesh(vertex[index0], vertex[index1], edgeMaterial);
 				THREE.GeometryUtils.merge(edgeAmalgam, eMesh);
 			}
