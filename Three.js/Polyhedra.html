@@ -205,21 +205,26 @@
 			var adjacent = [];
 			for (var i = 0; i < furthest.length; i++) {
 				polyhedronGetAdjacentVertices(furthest[i].to, data.edge).forEach(element => {
-					adjacent.push({from: furthest[i].from, to: element});
+					adjacent.push({from: furthest[i].from, to: element, planePoint: furthest[i].to});
 				});
 			}
 
 			var toRender = adjacent;
 			var polyhedron = new THREE.Object3D();
-			// convert edge data to cylinders
-			var edgeMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
+			var edgeMaterial = new THREE.MeshLambertMaterial({ color: 0x666666, side: THREE.DoubleSide });
 			var edgeAmalgam = new THREE.Geometry();
 			for (var i = 0; i < toRender.length; i++) {
 				var index0 = toRender[i].from;
 				var index1 = toRender[i].to;
-				var eMesh = cylinderMesh(vertex[index0], vertex[index1], edgeMaterial);
+				var third = toRender[i].planePoint;
+				var v1 = vertex[index0];
+				var v2 = vertex[index1];
+				var v3 = vertex[third];
+				var right = getvectorFromLineToPoint(v1, v2, v3).multiplyScalar(0.25);
+				var eMesh = doubleTriangleMesh(v1, v2, right);
 				THREE.GeometryUtils.merge(edgeAmalgam, eMesh);
 			}
+			edgeAmalgam.computeFaceNormals();
 			var edgeMesh = new THREE.Mesh(edgeAmalgam, edgeMaterial);
 			polyhedron.add(edgeMesh);
 			return polyhedron;
@@ -312,6 +317,38 @@
 			// the result should align with:
 			//   scene.add( new THREE.ArrowHelper( direction.clone().normalize(), point1, direction.length()) );
 		}
+		
+		// project point onto line, return vector from line to point
+        function getvectorFromLineToPoint(linePoint1, linePoint2, point) 
+        { 
+            var AB = new THREE.Vector3().subVectors(linePoint2, linePoint1); 
+            var AC = new THREE.Vector3().subVectors(point, linePoint1); 
+            var AP = AB.clone().multiplyScalar( AB.dot(AC) / AB.length() / AB.length());
+            var PC = new THREE.Vector3().subVectors(AC, AP); 
+            return PC; 
+        } 
+
+		function doubleTriangleMesh(point1, point2, rightDir) {
+			var direction = new THREE.Vector3().subVectors(point2, point1);
+            var mid = new THREE.Vector3().addVectors(point1, point2).divideScalar(2);
+            
+            var geometry = new THREE.Geometry();
+            
+            geometry.vertices.push(
+                point1,
+                new THREE.Vector3().subVectors(mid, rightDir),
+                new THREE.Vector3().addVectors(mid, rightDir),
+                point2,
+            );
+
+            geometry.faces.push( 
+                new THREE.Face3( 0, 1, 2 ),
+                new THREE.Face3( 1, 2, 3 ),
+            );
+                
+            return geometry;
+		}
+
 
 		function animate() {
 			requestAnimationFrame(animate);
